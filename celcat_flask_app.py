@@ -144,9 +144,9 @@ HTML_TEMPLATE = """
         <div class="controls">
             <div class="time-selector">
                 <input type="datetime-local" id="timeInput" />
-                <button onclick="checkAvailability()" id="checkBtn">Check</button>
+                <button onclick="checkAvailability()" id="checkBtn">Check (Heure choisie)</button>
             </div>
-            <button onclick="checkNow()" style="width: 100%; margin-top: 10px;">Check Now</button>
+            <button onclick="checkNow()" style="width: 100%; margin-top: 10px;">Check Now (Heure actuelle)</button>
         </div>
         <div id="loading" class="loading" style="display: none;">
             <div class="spinner"></div>
