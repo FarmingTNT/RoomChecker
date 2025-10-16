@@ -1,48 +1,239 @@
 #!/usr/bin/env python3
 """
-CELCAT Room Availability Checker for Building A29
-Checks which rooms and amphitheatres in building A29 are currently available
+Flask web server for A29 Room Availability Checker
+Run this on your computer/phone and access via browser
 """
 
+from flask import Flask, render_template_string, jsonify, request
 import requests
 from datetime import datetime, timedelta
-import sys
 
-# CELCAT API endpoint
+app = Flask(__name__)
+
 API_URL = "https://celcat.u-bordeaux.fr/Calendar/Home/GetCalendarData"
 
-# All A29 rooms and amphitheatres
 A29_ROOMS = [
-    "A29/ Amphithéâtre A",
-    "A29/ Amphithéâtre B",
-    "A29/ Amphithéâtre C",
-    "A29/ Amphithéâtre D",
-    "A29/ Amphithéâtre E",
-    "A29/ Amphithéâtre F",
-    "A29/ Amphithéâtre G",
-    "A29/ Salle 001",
-    "A29/ Salle 101",
-    "A29/ Salle 102",
-    "A29/ Salle 103",
-    "A29/ Salle 104",
-    "A29/ Salle 105",
-    "A29/ Salle 106",
-    "A29/ Salle 107",
+    "A29/ Amphithéâtre A", "A29/ Amphithéâtre B", "A29/ Amphithéâtre C",
+    "A29/ Amphithéâtre D", "A29/ Amphithéâtre E", "A29/ Amphithéâtre F",
+    "A29/ Amphithéâtre G", "A29/ Salle 001", "A29/ Salle 101",
+    "A29/ Salle 102", "A29/ Salle 103", "A29/ Salle 104",
+    "A29/ Salle 105", "A29/ Salle 106", "A29/ Salle 107",
 ]
+
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A29 Room Checker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        h1 { color: #333; font-size: 28px; margin-bottom: 10px; }
+        .subtitle { color: #666; font-size: 14px; }
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+        .time-selector { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        input[type="datetime-local"] {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            min-width: 200px;
+        }
+        button {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:hover { transform: translateY(-2px); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .loading {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .results {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .room-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            border-left: 4px solid #667eea;
+        }
+        .room-name { font-weight: 600; color: #333; font-size: 16px; }
+        .room-info { color: #666; font-size: 14px; margin-top: 5px; }
+        .next-available-section {
+            margin-top: 25px;
+            padding-top: 25px;
+            border-top: 2px solid #e0e0e0;
+        }
+        .next-available-card { border-left-color: #ffa726; }
+        .summary {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f4ff;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: 600;
+            color: #667eea;
+        }
+        .no-rooms { text-align: center; color: #999; padding: 30px; }
+        @media (max-width: 600px) {
+            .time-selector { flex-direction: column; }
+            input[type="datetime-local"], button { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏫 A29 Room Availability</h1>
+            <p class="subtitle">Université de Bordeaux - Building A29</p>
+        </div>
+        <div class="controls">
+            <div class="time-selector">
+                <input type="datetime-local" id="timeInput" />
+                <button onclick="checkAvailability()" id="checkBtn">Check (Heure actuelle)</button>
+            </div>
+            <button onclick="checkNow()" style="width: 100%; margin-top: 10px;">Check Now (Heure choisie)</button>
+        </div>
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Checking rooms...</p>
+        </div>
+        <div id="results" style="display: none;"></div>
+    </div>
+    <script>
+        function setDefaultTime() {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('timeInput').value = now.toISOString().slice(0, 16);
+        }
+
+        async function checkNow() {
+            setDefaultTime();
+            await checkAvailability();
+        }
+
+        async function checkAvailability() {
+            const timeInput = document.getElementById('timeInput').value;
+            if (!timeInput) { alert('Select a time'); return; }
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('checkBtn').disabled = true;
+
+            try {
+                const response = await fetch('/api/check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ time: timeInput })
+                });
+
+                const data = await response.json();
+                displayResults(data);
+            } catch (error) {
+                alert('Error checking availability');
+                console.error(error);
+            }
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('results').style.display = 'block';
+            document.getElementById('checkBtn').disabled = false;
+        }
+
+        function displayResults(data) {
+            let html = `<div class="results">
+                <p style="text-align: center; color: #666; margin-bottom: 20px;">
+                    ${data.check_time}
+                </p>
+                <div class="section-title">✅ Available Rooms</div>`;
+
+            if (data.available.length > 0) {
+                data.available.forEach(room => {
+                    html += `<div class="room-card">
+                        <div class="room-name">${room.name}</div>
+                        <div class="room-info">${room.info}</div>
+                    </div>`;
+                });
+            } else {
+                html += '<div class="no-rooms">No rooms available</div>';
+            }
+
+            if (data.next_available.length > 0) {
+                html += '<div class="next-available-section"><div class="section-title">🕒 Next Available</div>';
+                data.next_available.forEach(room => {
+                    html += `<div class="room-card next-available-card">
+                        <div class="room-name">${room.name}</div>
+                        <div class="room-info">${room.info}</div>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            html += `<div class="summary">${data.summary}</div></div>`;
+            document.getElementById('results').innerHTML = html;
+        }
+
+        window.onload = setDefaultTime;
+    </script>
+</body>
+</html>
+"""
 
 
 def get_room_schedule(room_name, start_date, end_date):
-    """
-    Fetch the schedule for a specific room from CELCAT API
-
-    Args:
-        room_name: Name of the room (e.g., "A29/ Amphithéâtre A")
-        start_date: Start date in YYYY-MM-DD format
-        end_date: End date in YYYY-MM-DD format
-
-    Returns:
-        List of events for the room, or None if request fails
-    """
     payload = {
         "start": start_date,
         "end": end_date,
@@ -51,212 +242,151 @@ def get_room_schedule(room_name, start_date, end_date):
         "federationIds[]": room_name,
         "colourScheme": "3"
     }
-
     try:
         response = requests.post(API_URL, data=payload, timeout=10)
         response.raise_for_status()
         return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching data for {room_name}: {e}", file=sys.stderr)
+    except:
         return None
 
 
-def is_room_available_now(events, current_time):
-    """
-    Check if a room is currently available based on its events
-
-    Args:
-        events: List of event dictionaries from API
-        current_time: Current datetime object
-
-    Returns:
-        True if room is available, False if occupied
-    """
+def is_room_available(events, check_time):
     if not events:
         return True
-
     for event in events:
         start = datetime.fromisoformat(event['start'])
         end = datetime.fromisoformat(event['end'])
-
-        if start <= current_time <= end:
+        if start <= check_time <= end:
             return False
-
     return True
 
 
-def get_next_event(events, current_time):
-    """
-    Get the next upcoming event for a room (only today)
-
-    Args:
-        events: List of event dictionaries from API
-        current_time: Current datetime object
-
-    Returns:
-        Next event dict or None if no upcoming events today
-    """
+def get_next_event_today(events, check_time):
     if not events:
         return None
+    check_date = check_time.date()
+    future = [e for e in events if datetime.fromisoformat(e['start']) > check_time
+              and datetime.fromisoformat(e['start']).date() == check_date]
+    return min(future, key=lambda e: datetime.fromisoformat(e['start'])) if future else None
 
-    current_date = current_time.date()
-    future_events = []
 
-    for event in events:
-        start = datetime.fromisoformat(event['start'])
-        # Only include events that are today and in the future
-        if start > current_time and start.date() == current_date:
-            future_events.append(event)
+def get_available_duration(events, check_time):
+    next_event = get_next_event_today(events, check_time)
+    if not next_event:
+        return float('inf')
+    return (datetime.fromisoformat(next_event['start']) - check_time).total_seconds() / 60
 
-    if not future_events:
+
+def get_next_availability(events, check_time):
+    if not events:
         return None
+    check_date = check_time.date()
 
-    # Return the soonest event
-    return min(future_events, key=lambda e: datetime.fromisoformat(e['start']))
-
-
-def get_available_duration(events, current_time):
-    """
-    Calculate how long a room will be available (in minutes)
-
-    Args:
-        events: List of event dictionaries from API
-        current_time: Current datetime object
-
-    Returns:
-        Duration in minutes until next event, or float('inf') if available rest of day
-    """
-    next_event = get_next_event(events, current_time)
-    if next_event:
-        next_start = datetime.fromisoformat(next_event['start'])
-        duration = (next_start - current_time).total_seconds() / 60
-        return duration
-    return float('inf')
-
-
-def get_next_availability(events, current_time):
-    """
-    Get when an occupied room will next become available today
-
-    Args:
-        events: List of event dictionaries from API
-        current_time: Current datetime object
-
-    Returns:
-        Tuple of (available_time, duration_available) or None if not available today
-    """
-    current_date = current_time.date()
-
-    # Find current event
-    current_event_end = None
+    current_end = None
     for event in events:
         start = datetime.fromisoformat(event['start'])
         end = datetime.fromisoformat(event['end'])
-        if start <= current_time <= end:
-            current_event_end = end
+        if start <= check_time <= end:
+            current_end = end
             break
 
-    if not current_event_end or current_event_end.date() != current_date:
+    if not current_end or current_end.date() != check_date:
         return None
 
-    # Find the next event after current one ends (if any)
-    next_event_after = None
-    for event in events:
-        start = datetime.fromisoformat(event['start'])
-        if start >= current_event_end and start.date() == current_date:
-            if next_event_after is None or start < datetime.fromisoformat(next_event_after['start']):
-                next_event_after = event
+    future = [e for e in events if datetime.fromisoformat(e['start']) >= current_end
+              and datetime.fromisoformat(e['start']).date() == check_date]
 
-    # Calculate duration available
-    if next_event_after:
-        next_start = datetime.fromisoformat(next_event_after['start'])
-        duration = (next_start - current_event_end).total_seconds() / 60
+    if future:
+        next_event = min(future, key=lambda e: datetime.fromisoformat(e['start']))
+        duration = (datetime.fromisoformat(next_event['start']) - current_end).total_seconds() / 60
     else:
         duration = float('inf')
 
-    return (current_event_end, duration)
+    return {'avail_time': current_end, 'duration': duration}
 
 
-def check_all_rooms():
-    """
-    Check availability of all A29 rooms and display results
-    """
-    now = datetime.now()
-    today = now.strftime("%Y-%m-%d")
-    tomorrow = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+@app.route('/')
+def index():
+    return render_template_string(HTML_TEMPLATE)
 
-    print(f"Checking room availability for {now.strftime('%Y-%m-%d %H:%M')}")
-    print("=" * 70)
+
+@app.route('/api/check', methods=['POST'])
+def check_availability():
+    data = request.json
+    check_time = datetime.fromisoformat(data['time'])
+    today = check_time.strftime("%Y-%m-%d")
+    tomorrow = (check_time + timedelta(days=1)).strftime("%Y-%m-%d")
 
     available_rooms = []
     occupied_rooms = []
 
     for room in A29_ROOMS:
         events = get_room_schedule(room, today, tomorrow)
-
         if events is None:
-            print(f"⚠️  {room}: Could not fetch data")
             continue
 
-        is_available = is_room_available_now(events, now)
-
-        if is_available:
-            duration = get_available_duration(events, now)
-            available_rooms.append((room, events, duration))
+        if is_room_available(events, check_time):
+            duration = get_available_duration(events, check_time)
+            available_rooms.append({'room': room, 'events': events, 'duration': duration})
         else:
-            next_avail = get_next_availability(events, now)
+            next_avail = get_next_availability(events, check_time)
             if next_avail:
-                occupied_rooms.append((room, events, next_avail[0], next_avail[1]))
+                occupied_rooms.append({
+                    'room': room,
+                    'avail_time': next_avail['avail_time'],
+                    'duration': next_avail['duration']
+                })
 
-    # Sort available rooms by duration (longest first)
-    available_rooms.sort(key=lambda x: (-x[2], x[0]))
+    # Sort
+    available_rooms.sort(key=lambda x: (-x['duration'], x['room']))
+    occupied_rooms.sort(key=lambda x: (x['avail_time'], -x['duration'], x['room']))
 
-    # Display available rooms
-    print("\n✅ AVAILABLE ROOMS:")
-    print("-" * 70)
-    if available_rooms:
-        for room, events, duration in available_rooms:
-            next_event = get_next_event(events, now)
-            if next_event:
-                next_start = datetime.fromisoformat(next_event['start'])
-                print(f"  {room}")
-                print(f"    Available until: {next_start.strftime('%H:%M')}")
+    # Format results
+    result = {
+        'check_time': check_time.strftime('%A, %B %d, %Y at %H:%M'),
+        'available': [],
+        'next_available': [],
+        'summary': f"{len(available_rooms)} available, {len(occupied_rooms)} occupied"
+    }
+
+    for item in available_rooms:
+        next_event = get_next_event_today(item['events'], check_time)
+        info = "Available for rest of day"
+        if next_event:
+            next_start = datetime.fromisoformat(next_event['start'])
+            info = f"Available until {next_start.strftime('%H:%M')}"
+        result['available'].append({'name': item['room'], 'info': info})
+
+    if len(available_rooms) <= 2:
+        for item in occupied_rooms[:2]:
+            avail_time = item['avail_time']
+            info = f"Available from {avail_time.strftime('%H:%M')}"
+            if item['duration'] != float('inf'):
+                until = avail_time + timedelta(minutes=item['duration'])
+                info += f" until {until.strftime('%H:%M')}"
             else:
-                print(f"  {room}")
-                print(f"    Available for the rest of the day")
-            print()
-    else:
-        print("  No rooms currently available")
+                info += " until end of day"
+            result['next_available'].append({'name': item['room'], 'info': info})
 
-    # If 2 or fewer available, show next 2 to become available
-    if len(available_rooms) <= 2 and occupied_rooms:
-        # Sort occupied rooms by: when they become available (soonest first),
-        # then by duration (longest first), then alphabetically
-        occupied_rooms.sort(key=lambda x: (x[2], -x[3], x[0]))
-
-        print("\n🕒 NEXT ROOMS TO BECOME AVAILABLE:")
-        print("-" * 70)
-        for i, (room, events, avail_time, duration) in enumerate(occupied_rooms[:2]):
-            print(f"  {room}")
-            print(f"    Available from: {avail_time.strftime('%H:%M')}")
-            if duration == float('inf'):
-                print(f"    Available until: End of day")
-            else:
-                until_time = avail_time + timedelta(minutes=duration)
-                print(f"    Available until: {until_time.strftime('%H:%M')}")
-            print()
-
-    # Summary
-    print("\n" + "=" * 70)
-    print(f"Summary: {len(available_rooms)} available, {len(occupied_rooms)} occupied")
+    return jsonify(result)
 
 
-if __name__ == "__main__":
-    try:
-        check_all_rooms()
-    except KeyboardInterrupt:
-        print("\n\nInterrupted by user")
-        sys.exit(0)
-    except Exception as e:
-        print(f"\nUnexpected error: {e}", file=sys.stderr)
-        sys.exit(1)
+if __name__ == '__main__':
+    import os
+
+    # Get port from environment variable (for Render/Heroku) or use 5000 for local
+    port = int(os.environ.get('PORT', 5000))
+
+    print("\n" + "="*50)
+    print("🏫 A29 Room Checker Server")
+    print("="*50)
+    print("\n📱 Access on your phone:")
+    print("   1. Connect to same WiFi as this computer")
+    print(f"   2. Open: http://YOUR_LOCAL_IP:{port}")
+    print("\n💻 Access on this computer:")
+    print(f"   Open: http://localhost:{port}")
+    print("\n" + "="*50 + "\n")
+
+    # Run on all interfaces so it's accessible from phones on same network
+    # Debug=False for production deployment
+    app.run(host='0.0.0.0', port=port, debug=False)
