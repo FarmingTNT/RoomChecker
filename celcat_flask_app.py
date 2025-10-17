@@ -53,7 +53,7 @@ HTML_TEMPLATE = """
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             margin-bottom: 20px;
         }
-        .time-selector { display: flex; flex-direction: column; gap: 10px; }
+        .time-selector { display: flex; gap: 10px; flex-wrap: wrap; }
         input[type="datetime-local"] {
             flex: 1;
             padding: 12px;
@@ -72,13 +72,12 @@ HTML_TEMPLATE = """
             font-weight: 600;
             cursor: pointer;
             transition: transform 0.2s;
-            width: 100%;
         }
         button:hover { transform: translateY(-2px); }
         button:disabled { opacity: 0.6; cursor: not-allowed; }
-        .check-now-btn {
-            background: linear-gradient(135deg, #48c6ef 0%, #6f86d6 100%);
-            margin-bottom: 20px;
+        .btn-now {
+            width: 100%;
+            margin-bottom: 35px;
         }
         .loading {
             background: white;
@@ -135,8 +134,8 @@ HTML_TEMPLATE = """
         }
         .no-rooms { text-align: center; color: #999; padding: 30px; }
         @media (max-width: 600px) {
-            body { padding: 10px; }
-            h1 { font-size: 22px; }
+            .time-selector { flex-direction: column; }
+            input[type="datetime-local"], button { width: 100%; }
         }
     </style>
 </head>
@@ -147,11 +146,11 @@ HTML_TEMPLATE = """
             <p class="subtitle">Université de Bordeaux - Building A29</p>
         </div>
         <div class="controls">
+            <button onclick="checkNow()" class="btn-now">Check Now (Heure actuelle)</button>
             <div class="time-selector">
                 <input type="datetime-local" id="timeInput" />
-                <button onclick="checkAvailability()" id="checkBtn">Check</button>
+                <button onclick="checkAvailability()" id="checkBtn">Check (Heure choisie)</button>
             </div>
-            <button onclick="checkNow()" style="width: 100%; margin-top: 10px;">Check Now</button>
         </div>
         <div id="loading" class="loading" style="display: none;">
             <div class="spinner"></div>
@@ -382,5 +381,16 @@ if __name__ == '__main__':
     # Get port from environment variable (for Render/Heroku) or use 5000 for local
     port = int(os.environ.get('PORT', 5000))
     
-    # Run on all interfaces so it's accessible from network
+    print("\n" + "="*50)
+    print("🏫 A29 Room Checker Server")
+    print("="*50)
+    print("\n📱 Access on your phone:")
+    print("   1. Connect to same WiFi as this computer")
+    print(f"   2. Open: http://YOUR_LOCAL_IP:{port}")
+    print("\n💻 Access on this computer:")
+    print(f"   Open: http://localhost:{port}")
+    print("\n" + "="*50 + "\n")
+    
+    # Run on all interfaces so it's accessible from phones on same network
+    # Debug=False for production deployment
     app.run(host='0.0.0.0', port=port, debug=False)
