@@ -281,7 +281,7 @@ def get_available_duration(events, check_time):
     return (datetime.fromisoformat(next_event['start']) - check_time).total_seconds() / 60
 
 
-def get_next_availability(events, check_time):
+def get_next_availability(events, check_time, min_duration=30):
     if not events:
         return None
     check_date = check_time.date()
@@ -306,7 +306,11 @@ def get_next_availability(events, check_time):
     else:
         duration = float('inf')
     
-    return {'avail_time': current_end, 'duration': duration}
+    # Only return if the next availability is at least min_duration minutes
+    if duration >= min_duration:
+        return {'avail_time': current_end, 'duration': duration}
+    else:
+        return None
 
 
 @app.route('/')
