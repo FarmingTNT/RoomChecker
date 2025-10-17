@@ -281,7 +281,7 @@ def get_available_duration(events, check_time):
     return (datetime.fromisoformat(next_event['start']) - check_time).total_seconds() / 60
 
 
-def get_next_availability(events, check_time, min_duration=20):
+def get_next_availability(events, check_time):
     if not events:
         return None
     check_date = check_time.date()
@@ -306,11 +306,7 @@ def get_next_availability(events, check_time, min_duration=20):
     else:
         duration = float('inf')
     
-    # Only return if the next availability is at least min_duration minutes
-    if duration >= min_duration:
-        return {'avail_time': current_end, 'duration': duration}
-    else:
-        return None
+    return {'avail_time': current_end, 'duration': duration}
 
 
 @app.route('/')
@@ -328,7 +324,7 @@ def check_availability():
     available_rooms = []
     occupied_rooms = []
     
-    MIN_DURATION = 20  # Minimum duration in minutes to consider a room available
+    MIN_DURATION = 30  # Minimum duration in minutes to consider a room available
     
     for room in A29_ROOMS:
         events = get_room_schedule(room, today, tomorrow)
@@ -337,25 +333,17 @@ def check_availability():
         
         if is_room_available(events, check_time):
             duration = get_available_duration(events, check_time)
-            # Only consider room available if it's free for at least 20 minutes
+            # Only consider room available if it's free for at least 30 minutes
             if duration >= MIN_DURATION:
                 available_rooms.append({'room': room, 'events': events, 'duration': duration})
             else:
-                # Treat as occupied if available for less than 20 minutes
-                # Try to find next availability that meets the minimum duration
+                # Treat as occupied if available for less than 30 minutes
                 next_avail = get_next_availability(events, check_time)
                 if next_avail:
                     occupied_rooms.append({
                         'room': room,
                         'avail_time': next_avail['avail_time'],
                         'duration': next_avail['duration']
-                    })
-                else:
-                    # No valid next availability, still count as occupied
-                    occupied_rooms.append({
-                        'room': room,
-                        'avail_time': None,
-                        'duration': 0
                     })
         else:
             next_avail = get_next_availability(events, check_time)
@@ -364,13 +352,6 @@ def check_availability():
                     'room': room,
                     'avail_time': next_avail['avail_time'],
                     'duration': next_avail['duration']
-                })
-            else:
-                # Occupied but no valid next availability, still count as occupied
-                occupied_rooms.append({
-                    'room': room,
-                    'avail_time': None,
-                    'duration': 0
                 })
     
     # Sort
