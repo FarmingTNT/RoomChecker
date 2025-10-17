@@ -324,6 +324,8 @@ def check_availability():
     available_rooms = []
     occupied_rooms = []
     
+    MIN_DURATION = 30  # Minimum duration in minutes to consider a room available
+    
     for room in A29_ROOMS:
         events = get_room_schedule(room, today, tomorrow)
         if events is None:
@@ -331,7 +333,18 @@ def check_availability():
         
         if is_room_available(events, check_time):
             duration = get_available_duration(events, check_time)
-            available_rooms.append({'room': room, 'events': events, 'duration': duration})
+            # Only consider room available if it's free for at least 30 minutes
+            if duration >= MIN_DURATION:
+                available_rooms.append({'room': room, 'events': events, 'duration': duration})
+            else:
+                # Treat as occupied if available for less than 30 minutes
+                next_avail = get_next_availability(events, check_time)
+                if next_avail:
+                    occupied_rooms.append({
+                        'room': room,
+                        'avail_time': next_avail['avail_time'],
+                        'duration': next_avail['duration']
+                    })
         else:
             next_avail = get_next_availability(events, check_time)
             if next_avail:
