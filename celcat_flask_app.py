@@ -53,7 +53,7 @@ HTML_TEMPLATE = """
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             margin-bottom: 20px;
         }
-        .time-selector { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        .time-selector { display: flex; flex-direction: column; gap: 10px; }
         input[type="datetime-local"] {
             flex: 1;
             padding: 12px;
@@ -72,9 +72,14 @@ HTML_TEMPLATE = """
             font-weight: 600;
             cursor: pointer;
             transition: transform 0.2s;
+            width: 100%;
         }
         button:hover { transform: translateY(-2px); }
         button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .check-now-btn {
+            background: linear-gradient(135deg, #48c6ef 0%, #6f86d6 100%);
+            margin-bottom: 20px;
+        }
         .loading {
             background: white;
             padding: 40px;
@@ -130,8 +135,8 @@ HTML_TEMPLATE = """
         }
         .no-rooms { text-align: center; color: #999; padding: 30px; }
         @media (max-width: 600px) {
-            .time-selector { flex-direction: column; }
-            input[type="datetime-local"], button { width: 100%; }
+            body { padding: 10px; }
+            h1 { font-size: 22px; }
         }
     </style>
 </head>
