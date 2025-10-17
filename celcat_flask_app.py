@@ -377,16 +377,5 @@ if __name__ == '__main__':
     # Get port from environment variable (for Render/Heroku) or use 5000 for local
     port = int(os.environ.get('PORT', 5000))
     
-    print("\n" + "="*50)
-    print("🏫 A29 Room Checker Server")
-    print("="*50)
-    print("\n📱 Access on your phone:")
-    print("   1. Connect to same WiFi as this computer")
-    print(f"   2. Open: http://YOUR_LOCAL_IP:{port}")
-    print("\n💻 Access on this computer:")
-    print(f"   Open: http://localhost:{port}")
-    print("\n" + "="*50 + "\n")
-    
-    # Run on all interfaces so it's accessible from phones on same network
-    # Debug=False for production deployment
+    # Run on all interfaces so it's accessible from network
     app.run(host='0.0.0.0', port=port, debug=False)
