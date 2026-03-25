@@ -5,6 +5,7 @@ Run this on your computer/phone and access via browser
 """
 
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template_string, jsonify, request, send_from_directory
 import requests
 from datetime import datetime, timedelta
@@ -12,6 +13,8 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 
 API_URL = "https://celcat.u-bordeaux.fr/Calendar/Home/GetCalendarData"
+REQUEST_TIMEOUT_SECONDS = float(os.environ.get('ROOMCHECKER_REQUEST_TIMEOUT', '8'))
+MAX_FETCH_WORKERS = int(os.environ.get('ROOMCHECKER_MAX_WORKERS', '12'))
 
 A29_ROOMS = [
     "A29/ Amphithéâtre A", "A29/ Amphithéâtre B", "A29/ Amphithéâtre C",
@@ -469,11 +472,33 @@ def get_room_schedule(room_name, start_date, end_date):
         "colourScheme": "3"
     }
     try:
-        response = requests.post(API_URL, data=payload, timeout=10)
+        response = requests.post(API_URL, data=payload, timeout=REQUEST_TIMEOUT_SECONDS)
         response.raise_for_status()
         return response.json()
     except (requests.RequestException, ValueError):
         return None
+
+
+def get_room_schedules_parallel(rooms, start_date, end_date):
+    if not rooms:
+        return {}
+
+    workers = max(1, min(MAX_FETCH_WORKERS, len(rooms)))
+    schedules = {}
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        future_to_room = {
+            executor.submit(get_room_schedule, room, start_date, end_date): room
+            for room in rooms
+        }
+        for future in as_completed(future_to_room):
+            room = future_to_room[future]
+            try:
+                schedules[room] = future.result()
+            except Exception:
+                schedules[room] = None
+
+    return schedules
 
 
 def parse_event_bounds(event):
@@ -624,12 +649,13 @@ def check_availability():
 
     today = check_time.strftime("%Y-%m-%d")
     tomorrow = (check_time + timedelta(days=1)).strftime("%Y-%m-%d")
+    room_schedules = get_room_schedules_parallel(rooms_to_check, today, tomorrow)
     
     available_rooms = []
     occupied_rooms = []
     
     for room in rooms_to_check:
-        events = get_room_schedule(room, today, tomorrow)
+        events = room_schedules.get(room)
         if events is None:
             continue
         
