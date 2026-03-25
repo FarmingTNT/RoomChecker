@@ -15,7 +15,7 @@ app = Flask(__name__)
 
 API_URL = "https://celcat.u-bordeaux.fr/Calendar/Home/GetCalendarData"
 REQUEST_TIMEOUT_SECONDS = float(os.environ.get('ROOMCHECKER_REQUEST_TIMEOUT', '8'))
-MAX_FETCH_WORKERS = int(os.environ.get('ROOMCHECKER_MAX_WORKERS', '12'))
+MAX_FETCH_WORKERS = int(os.environ.get('ROOMCHECKER_MAX_WORKERS', '30'))
 
 A29_ROOMS = [
     "A29/ Amphithéâtre A", "A29/ Amphithéâtre B", "A29/ Amphithéâtre C",
@@ -489,7 +489,7 @@ def get_room_schedule(room_name, start_date, end_date):
 
 def get_room_schedules_parallel(rooms, start_date, end_date):
     if not rooms:
-        return {}
+        return {}, 0
 
     workers = max(1, min(MAX_FETCH_WORKERS, len(rooms)))
     schedules = {}
@@ -506,7 +506,7 @@ def get_room_schedules_parallel(rooms, start_date, end_date):
             except Exception:
                 schedules[room] = None
 
-    return schedules
+    return schedules, workers
 
 
 def parse_event_bounds(event):
@@ -658,7 +658,7 @@ def check_availability():
 
     today = check_time.strftime("%Y-%m-%d")
     tomorrow = (check_time + timedelta(days=1)).strftime("%Y-%m-%d")
-    room_schedules = get_room_schedules_parallel(rooms_to_check, today, tomorrow)
+    room_schedules, active_workers = get_room_schedules_parallel(rooms_to_check, today, tomorrow)
     successful_fetches = sum(1 for events in room_schedules.values() if events is not None)
     failed_fetches = len(rooms_to_check) - successful_fetches
     
@@ -720,6 +720,7 @@ def check_availability():
     print(
         f"[{datetime.now().strftime('%H:%M:%S')}] scope={scope} status=done "
         f"elapsed={total_elapsed:.2f}s rooms={len(rooms_to_check)} "
+        f"workers={active_workers} "
         f"fetch_ok={successful_fetches} fetch_failed={failed_fetches} "
         f"available={len(available_rooms)} occupied={len(occupied_rooms)}"
     )
