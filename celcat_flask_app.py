@@ -294,11 +294,18 @@ HTML_TEMPLATE = """
         }
         @media (max-width: 600px) {
             .header {
-                flex-direction: column;
-                text-align: center;
+                flex-direction: row;
+                text-align: left;
+                align-items: center;
+                gap: 12px;
+                padding: 18px;
             }
             .header-text {
-                align-items: center;
+                align-items: flex-start;
+            }
+            .logo {
+                width: 52px;
+                height: 52px;
             }
             .top-row, .bottom-row, .time-selector { flex-direction: column; }
             .bottom-row { margin-top: 27px; }
@@ -325,11 +332,11 @@ HTML_TEMPLATE = """
                         <input type="text" id="timeInput" placeholder="Choisissez une date et une heure" />
                         <span class="time-input-icon">📅</span>
                     </div>
-                    <button onclick="checkAvailability()" id="checkBtn">Vérifier l'heure choisie</button>
+                    <button onclick="checkAvailability()" id="checkBtn">Heure choisie</button>
                 </div>
             </div>
             <div class="bottom-row">
-                <button onclick="checkNow()" class="btn-now">Vérifier pour l'heure actuelle</button>
+                <button onclick="checkNow()" class="btn-now">Heure actuelle</button>
                 <select id="buildingSelect">
                     <option value="A29" selected>Bâtiment A29</option>
                     <option value="A22">Bâtiment A22</option>
