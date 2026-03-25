@@ -6,6 +6,7 @@ Run this on your computer/phone and access via browser
 
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from time import perf_counter
 from flask import Flask, render_template_string, jsonify, request, send_from_directory
 import requests
 from datetime import datetime, timedelta
@@ -463,6 +464,7 @@ HTML_TEMPLATE = """
 
 
 def get_room_schedule(room_name, start_date, end_date):
+    started = perf_counter()
     payload = {
         "start": start_date,
         "end": end_date,
@@ -474,8 +476,14 @@ def get_room_schedule(room_name, start_date, end_date):
     try:
         response = requests.post(API_URL, data=payload, timeout=REQUEST_TIMEOUT_SECONDS)
         response.raise_for_status()
-        return response.json()
-    except (requests.RequestException, ValueError):
+        data = response.json()
+        elapsed = perf_counter() - started
+        event_count = len(data) if isinstance(data, list) else "n/a"
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] room={room_name} status=ok elapsed={elapsed:.2f}s events={event_count}")
+        return data
+    except (requests.RequestException, ValueError) as exc:
+        elapsed = perf_counter() - started
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] room={room_name} status=error elapsed={elapsed:.2f}s error={type(exc).__name__}")
         return None
 
 
@@ -638,6 +646,7 @@ def logo():
 
 @app.route('/api/check', methods=['POST'])
 def check_availability():
+    request_started = perf_counter()
     data = request.json
     check_time = datetime.fromisoformat(data['time'])
     scope = str(data.get('building', 'A29')).upper()
@@ -650,6 +659,8 @@ def check_availability():
     today = check_time.strftime("%Y-%m-%d")
     tomorrow = (check_time + timedelta(days=1)).strftime("%Y-%m-%d")
     room_schedules = get_room_schedules_parallel(rooms_to_check, today, tomorrow)
+    successful_fetches = sum(1 for events in room_schedules.values() if events is not None)
+    failed_fetches = len(rooms_to_check) - successful_fetches
     
     available_rooms = []
     occupied_rooms = []
@@ -704,6 +715,14 @@ def check_availability():
             else:
                 info += " jusqu'à la fin de la journée"
             result['next_available'].append({'name': room_display_name(item['room']), 'info': info})
+
+    total_elapsed = perf_counter() - request_started
+    print(
+        f"[{datetime.now().strftime('%H:%M:%S')}] scope={scope} status=done "
+        f"elapsed={total_elapsed:.2f}s rooms={len(rooms_to_check)} "
+        f"fetch_ok={successful_fetches} fetch_failed={failed_fetches} "
+        f"available={len(available_rooms)} occupied={len(occupied_rooms)}"
+    )
     
     return jsonify(result)
 
