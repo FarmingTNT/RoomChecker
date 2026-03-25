@@ -15,7 +15,7 @@ app = Flask(__name__)
 
 API_URL = "https://celcat.u-bordeaux.fr/Calendar/Home/GetCalendarData"
 REQUEST_TIMEOUT_SECONDS = float(os.environ.get('ROOMCHECKER_REQUEST_TIMEOUT', '8'))
-MAX_FETCH_WORKERS = int(os.environ.get('ROOMCHECKER_MAX_WORKERS', '30'))
+MAX_FETCH_WORKERS = int(os.environ.get('ROOMCHECKER_MAX_WORKERS', '4'))
 
 A29_ROOMS = [
     "A29/ Amphithéâtre A", "A29/ Amphithéâtre B", "A29/ Amphithéâtre C",
